@@ -1,14 +1,13 @@
-# Ignore AI models
-model/
-*.h5
+# Ignore large models
 *.pt
+*.h5
 
 # temp images
 temp.jpg
 
-# logs
-logs/
-
 # python cache
 __pycache__/
 *.pyc
+
+# IDE files
+.idea/

@@ -1,15 +1,15 @@
 import streamlit as st
 from detect import detect_objects
 from PIL import Image
-import os
 
 st.title("AI Object Detection System")
 
-uploaded_file = st.file_uploader("Upload an Image", type=["jpg","png","jpeg"])
+st.write("Upload an image and the AI will detect objects.")
+
+uploaded_file = st.file_uploader("Upload Image", type=["jpg","png","jpeg"])
 
 if uploaded_file is not None:
 
-    # Save uploaded image
     image = Image.open(uploaded_file)
     image.save("temp.jpg")
 
