@@ -1,0 +1,14 @@
+# Ignore AI models
+model/
+*.h5
+*.pt
+
+# temp images
+temp.jpg
+
+# logs
+logs/
+
+# python cache
+__pycache__/
+*.pyc
