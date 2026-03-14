@@ -2,12 +2,26 @@
 *.pt
 *.h5
 
-# temp images
+# Temporary images
 temp.jpg
+output.jpg
 
-# python cache
+# Python cache
 __pycache__/
 *.pyc
 
+# Logs
+logs/
+
+# Dataset folders
+dataset/
+
+# Model folders
+model/
+
 # IDE files
 .idea/
+.vscode/
+
+# System files
+.DS_Store

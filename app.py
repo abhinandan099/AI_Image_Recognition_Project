@@ -1,28 +1,57 @@
 import streamlit as st
 from detect import detect_objects
-from PIL import Image
+import pandas as pd
+import datetime
+import os
 
-st.title("AI Object Detection System")
+st.set_page_config(page_title="AI Object Detection System", layout="wide")
 
-st.write("Upload an image and the AI will detect objects.")
+st.title("AI Image Recognition System")
 
-uploaded_file = st.file_uploader("Upload Image", type=["jpg","png","jpeg"])
+# -------- Sidebar Navigation --------
 
-if uploaded_file is not None:
+page = st.sidebar.selectbox(
+    "Navigation",
+    ["Object Detection", "Analytics Dashboard"]
+)
 
-    image = Image.open(uploaded_file)
-    image.save("temp.jpg")
+# -------- OBJECT DETECTION PAGE --------
 
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+if page == "Object Detection":
 
-    st.write("Detecting objects...")
+    st.header("Upload Image for AI Detection")
 
-    objects = detect_objects("temp.jpg")
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 
-    st.subheader("Detected Objects")
+    if uploaded_file is not None:
 
-    if len(objects) == 0:
-        st.write("No objects detected")
-    else:
-        for obj in objects:
-            st.write(f"{obj[0]} : {round(obj[1]*100,2)}%")
+        with open("temp.jpg", "wb") as f:
+            f.write(uploaded_file.read())
+
+        objects, output_img = detect_objects("temp.jpg")
+
+        st.image(output_img, caption="Detected Objects", use_column_width=True)
+
+        st.subheader("Detected Objects")
+
+        object_counts = {}
+
+        data = []
+
+        for obj, conf in objects:
+
+            st.write(f"{obj} : {conf:.2f}")
+
+            object_counts[obj] = object_counts.get(obj, 0) + 1
+
+            data.append({
+                "object": obj,
+                "confidence": conf,
+                "time": datetime.datetime.now()
+            })
+
+        st.subheader("Object Count")
+
+        st.write(object_counts)
+
+        df = pd.DataFrame(data)
