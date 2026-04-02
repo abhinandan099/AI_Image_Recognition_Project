@@ -2,44 +2,41 @@ from ultralytics import YOLO
 import cv2
 import os
 
+# Load model once
 model = YOLO("yolov8n.pt")
+
 
 def detect_objects(image_path):
     if not os.path.exists(image_path):
-        raise ValueError("❌ Image path does not exist")
+        return [], None
 
-    image = cv2.imread(image_path)
+    try:
+        results = model(image_path)
 
-    if image is None:
-        raise ValueError("❌ Image is empty or corrupted")
+        if results is None or len(results) == 0:
+            return [], None
 
-    # FIX: pass image instead of path
-    results = model(image)
+        result = results[0]
 
-    detected_objects = []
+        if result.boxes is None:
+            return [], None
 
-    for r in results:
-        for box in r.boxes:
-            cls = int(box.cls)
-            conf = float(box.conf)
-            label = model.names[cls]
+        boxes = result.boxes
+        names = model.names
 
-            detected_objects.append((label, conf))
+        detected_objects = []
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
+        for box in boxes:
+            cls_id = int(box.cls[0])
+            label = names[cls_id]
+            detected_objects.append(label)
 
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0,255,0), 2)
-            cv2.putText(
-                image,
-                f"{label} {conf:.2f}",
-                (x1, y1-10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0,255,0),
-                2
-            )
+        # Save output image
+        output_path = "output.jpg"
+        result.save(filename=output_path)
 
-    output_path = "output.jpg"
-    cv2.imwrite(output_path, image)
+        return list(set(detected_objects)), output_path
 
-    return detected_objects, output_path
+    except Exception as e:
+        print("Error:", e)
+        return [], None
