@@ -1,57 +1,68 @@
 import streamlit as st
 from detect import detect_objects
+from predict import predict_image
+from logger import log_prediction
 import pandas as pd
-import datetime
 import os
+import time
 
-st.set_page_config(page_title="AI Object Detection System", layout="wide")
+st.set_page_config(page_title="AI Image Recognition", layout="wide")
 
 st.title("AI Image Recognition System")
 
-# -------- Sidebar Navigation --------
+page = st.sidebar.selectbox("Navigation", ["Detection", "Analytics"])
 
-page = st.sidebar.selectbox(
-    "Navigation",
-    ["Object Detection", "Analytics Dashboard"]
-)
+if page == "Detection":
 
-# -------- OBJECT DETECTION PAGE --------
-
-if page == "Object Detection":
-
-    st.header("Upload Image for AI Detection")
-
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg","png","jpeg"])
 
     if uploaded_file is not None:
 
-        with open("temp.jpg", "wb") as f:
-            f.write(uploaded_file.read())
+        file_bytes = uploaded_file.read()
 
-        objects, output_img = detect_objects("temp.jpg")
+        if len(file_bytes) == 0:
+            st.error("Uploaded file is empty ❌")
+        else:
+            with open("temp.jpg", "wb") as f:
+                f.write(file_bytes)
 
-        st.image(output_img, caption="Detected Objects", use_column_width=True)
+            time.sleep(0.5)  # FIX timing issue
 
-        st.subheader("Detected Objects")
+            try:
+                objects, output_img = detect_objects("temp.jpg")
 
-        object_counts = {}
+                st.image(output_img, caption="Detected Objects")
 
-        data = []
+                st.subheader("Objects Found")
+                object_names = [obj for obj, _ in objects]
 
-        for obj, conf in objects:
+                for obj, conf in objects:
+                    st.write(f"{obj} : {conf:.2f}")
 
-            st.write(f"{obj} : {conf:.2f}")
+                food_items = ["banana","apple","orange","pizza","cake"]
 
-            object_counts[obj] = object_counts.get(obj, 0) + 1
+                if any(obj in food_items for obj in object_names):
+                    label, confidence = predict_image("temp.jpg")
 
-            data.append({
-                "object": obj,
-                "confidence": conf,
-                "time": datetime.datetime.now()
-            })
+                    st.subheader("Food Freshness")
+                    st.success(label)
+                    st.write(f"Confidence: {confidence:.2f}")
 
-        st.subheader("Object Count")
+                    log_prediction("temp.jpg", label, confidence)
+                else:
+                    st.info("No food detected → skipping freshness")
 
-        st.write(object_counts)
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
 
-        df = pd.DataFrame(data)
+elif page == "Analytics":
+
+    file_path = "logs/predictions.csv"
+
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+
+        st.bar_chart(df["prediction"].value_counts())
+        st.dataframe(df)
+    else:
+        st.warning("No data yet")

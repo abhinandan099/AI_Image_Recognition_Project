@@ -1,27 +1,29 @@
-import cv2
-import numpy as np
 import tensorflow as tf
+import numpy as np
+from PIL import Image
+import os
 
-# Load trained model
-model = tf.keras.models.load_model("model/food_classifier.h5")
+MODEL_PATH = "model/food_classifier.keras"
+
+if not os.path.exists(MODEL_PATH):
+    raise Exception("❌ Train model first using train_model.py")
+
+model = tf.keras.models.load_model(MODEL_PATH)
 
 def predict_image(image_path):
+    try:
+        img = Image.open(image_path).convert("RGB")
+        img = img.resize((150,150))
 
-    img = cv2.imread(image_path)
+        img_array = np.array(img) / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
 
-    img = cv2.resize(img,(150,150))
+        pred = model.predict(img_array)[0][0]
 
-    img = img/255.0
+        if pred < 0.5:
+            return "Fresh", float(1 - pred)
+        else:
+            return "Stale", float(pred)
 
-    img = np.reshape(img,(1,150,150,3))
-
-    prediction = model.predict(img)
-
-    if prediction[0][0] > 0.5:
-        label = "Stale"
-        confidence = prediction[0][0]
-    else:
-        label = "Fresh"
-        confidence = 1 - prediction[0][0]
-
-    return label, confidence
+    except Exception as e:
+        return f"Error: {e}", 0.0
