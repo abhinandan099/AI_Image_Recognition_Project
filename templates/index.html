@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Recognition System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="{% if result %}has-results{% endif %}">
+    <div class="app-shell">
+        <div class="backdrop-grid"></div>
+        <div class="backdrop-glow glow-left"></div>
+        <div class="backdrop-glow glow-right"></div>
+
+        <div class="ai-indicator glass-panel" aria-live="polite">
+            <span class="indicator-dot"></span>
+            <div>
+                <p class="indicator-label">AI Status</p>
+                <p class="indicator-message">
+                    {% if result and result.objects is defined and result.total_objects %}
+                        {{ result.total_objects }} objects detected. Largest: {{ result.largest_object.name }} ({{ result.largest_object.area_percent }}%).
+                    {% elif result and result.label is defined %}
+                        Freshness result ready: {{ result.label }} at {{ (result.confidence * 100) | round(1) }}%.
+                    {% elif error %}
+                        Awaiting valid image input.
+                    {% else %}
+                        System idle. Upload an image to begin analysis.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <main class="dashboard">
+            <header class="topbar glass-panel scroll-reveal">
+                <div class="brand-block">
+                    <p class="eyebrow">AI Image Recognition System</p>
+                    <h1>Production-ready visual inspection and object analysis.</h1>
+                    <p class="lead">
+                        Analyze images with object detection or food freshness classification, then inspect outputs in a
+                        large viewer with structured confidence and coverage data.
+                    </p>
+                </div>
+                <div class="topbar-metrics">
+                    <div class="metric-card">
+                        <span>Modes</span>
+                        <strong>Detection / Freshness</strong>
+                    </div>
+                    <div class="metric-card">
+                        <span>Input</span>
+                        <strong>JPG, JPEG, PNG</strong>
+                    </div>
+                    <div class="metric-card">
+                        <span>Viewer</span>
+                        <strong>Inspect / Compare / Zoom</strong>
+                    </div>
+                </div>
+            </header>
+
+            <section class="hero-section glass-panel scroll-reveal">
+                <div class="hero-copy">
+                    <p class="eyebrow">Live Analysis Preview</p>
+                    <h2>Realtime-style AI analysis with clean, product-grade presentation.</h2>
+                    <p>
+                        The system emphasizes accurate inspection, clear metrics, and large-format visual review rather than a playground-style UI.
+                    </p>
+                    <div class="hero-status">
+                        <span class="status-pill">Analyzing Image</span>
+                        <span class="status-pill secondary">Processing Objects</span>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="hero-feed">
+                        <div class="hero-scanline"></div>
+                        <div class="hero-overlay-box box-one"><span>person 91%</span></div>
+                        <div class="hero-overlay-box box-two"><span>car 84%</span></div>
+                        <div class="hero-overlay-box box-three"><span>bowl 77%</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="workspace">
+                <aside class="control-panel glass-panel scroll-reveal">
+                    <div class="panel-heading">
+                        <p class="eyebrow">Control Panel</p>
+                        <h3>Input and analysis mode</h3>
+                    </div>
+
+                    {% if error %}
+                        <div class="alert error">{{ error }}</div>
+                    {% endif %}
+
+                    <form method="post" enctype="multipart/form-data" id="analysis-form" class="control-form">
+                        <div class="mode-grid">
+                            <label class="mode-card {% if selected_task != 'classification' %}is-selected{% endif %}">
+                                <input type="radio" name="task" value="detection" {% if selected_task != 'classification' %}checked{% endif %}>
+                                <span class="mode-index">01</span>
+                                <span class="mode-content">
+                                    <strong>Object Detection</strong>
+                                    <span>Identify objects, confidence scores, and image area coverage.</span>
+                                </span>
+                            </label>
+
+                            <label class="mode-card {% if selected_task == 'classification' %}is-selected{% endif %}">
+                                <input type="radio" name="task" value="classification" {% if selected_task == 'classification' %}checked{% endif %}>
+                                <span class="mode-index">02</span>
+                                <span class="mode-content">
+                                    <strong>Food Freshness</strong>
+                                    <span>Classify the item as fresh or stale with confidence level.</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <label class="upload-zone" for="image" id="upload-zone">
+                            <input type="file" name="image" id="image" accept="image/png, image/jpeg" required>
+                            <span class="upload-title">Upload inspection image</span>
+                            <span class="upload-subtitle">Drag and drop or click to browse.</span>
+                        </label>
+
+                        <div class="preview-card {% if image_url %}has-image{% endif %}" id="preview-panel">
+                            <div class="preview-copy">
+                                <p class="preview-label">Current Input</p>
+                                <p id="file-name">{% if image_url %}Image ready for analysis{% else %}No file selected yet{% endif %}</p>
+                            </div>
+                            <img
+                                id="image-preview"
+                                class="preview-image {% if image_url %}is-visible{% endif %}"
+                                src="{% if image_url %}{{ image_url }}{% endif %}"
+                                alt="Selected image preview"
+                            >
+                        </div>
+
+                        <button type="submit" class="primary-button" id="submit-button">
+                            <span class="button-text">Run Analysis</span>
+                            <span class="button-loader" aria-hidden="true"></span>
+                        </button>
+                    </form>
+                </aside>
+
+                <section class="results-stage glass-panel scroll-reveal {% if result %}has-content{% endif %}">
+                    <div class="stage-header">
+                        <div>
+                            <p class="eyebrow">Inspection Viewer</p>
+                            <h3>{{ result.task_name if result else 'Awaiting Analysis' }}</h3>
+                        </div>
+                        {% if result %}
+                            <div class="viewer-actions">
+                                {% if result.objects is defined %}
+                                    <button type="button" class="viewer-toggle is-active" id="toggle-boxes">Bounding Boxes</button>
+                                    <button type="button" class="viewer-toggle is-active" id="toggle-overlays">Area Overlay</button>
+                                {% endif %}
+                                <button type="button" class="viewer-toggle" id="focus-button">Fullscreen View</button>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {% if result %}
+                        {% if result.objects is defined %}
+                            <div class="inspection-layout">
+                                <div class="viewer-panel">
+                                    <div class="compare-toolbar">
+                                        <span>Original</span>
+                                        <input type="range" min="0" max="100" value="55" id="compare-range" aria-label="Comparison slider">
+                                        <span>Processed</span>
+                                    </div>
+                                    <div class="viewer-frame" id="viewer-frame">
+                                        <div class="pan-zoom-frame" id="pan-zoom-frame">
+                                            <img src="{{ image_url }}" alt="Original image" class="compare-base">
+                                            <div class="compare-overlay" id="compare-overlay" style="width: 55%;">
+                                                <img src="{{ output_image_url }}" alt="Processed image" class="compare-image">
+                                            </div>
+                                            <div class="compare-divider" id="compare-divider" style="left: 55%;"></div>
+
+                                            {% for object in result.objects %}
+                                                <button
+                                                    type="button"
+                                                    class="detection-box"
+                                                    data-box-id="box-{{ loop.index0 }}"
+                                                    data-target-id="row-{{ loop.index0 }}"
+                                                    data-left="{{ object.bbox.left_percent }}"
+                                                    data-top="{{ object.bbox.top_percent }}"
+                                                    data-width="{{ object.bbox.width_percent }}"
+                                                    data-height="{{ object.bbox.height_percent }}"
+                                                    aria-label="{{ object.name }} {{ object.confidence_percent }} percent confidence"
+                                                    style="
+                                                        left: {{ object.bbox.left_percent }}%;
+                                                        top: {{ object.bbox.top_percent }}%;
+                                                        width: {{ object.bbox.width_percent }}%;
+                                                        height: {{ object.bbox.height_percent }}%;
+                                                    "
+                                                >
+                                                    <span>{{ object.name }} {{ object.confidence_percent }}%</span>
+                                                </button>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <aside class="analysis-panel">
+                                    <div class="analysis-summary">
+                                        <div class="summary-card">
+                                            <span>Total Objects</span>
+                                            <strong>{{ result.total_objects }}</strong>
+                                        </div>
+                                        <div class="summary-card">
+                                            <span>Largest Object</span>
+                                            <strong>
+                                                {% if result.largest_object %}
+                                                    {{ result.largest_object.name }}
+                                                {% else %}
+                                                    None
+                                                {% endif %}
+                                            </strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="object-list">
+                                        {% for object in result.objects %}
+                                            <article class="object-row" id="row-{{ loop.index0 }}" data-target-box="box-{{ loop.index0 }}">
+                                                <div class="object-row-top">
+                                                    <div>
+                                                        <h4>{{ object.name }}</h4>
+                                                        <p>{{ object.confidence_percent }}% confidence</p>
+                                                    </div>
+                                                    <strong>{{ object.area_percent }}%</strong>
+                                                </div>
+                                                <div class="coverage-bar">
+                                                    <span style="width: {{ object.area_percent }}%;"></span>
+                                                </div>
+                                                <p class="coverage-label">Area coverage of image</p>
+                                            </article>
+                                        {% endfor %}
+                                    </div>
+                                </aside>
+                            </div>
+                        {% elif result.label is defined %}
+                            <div class="freshness-layout">
+                                <div class="freshness-viewer">
+                                    {% if image_url %}
+                                        <img src="{{ image_url }}" alt="Analyzed freshness image">
+                                    {% endif %}
+                                </div>
+                                <div class="freshness-panel">
+                                    <div class="freshness-ring" style="--progress: {{ (result.confidence * 100) | round(1) }};">
+                                        <div class="freshness-core">
+                                            <strong>{{ result.label }}</strong>
+                                            <span>{{ (result.confidence * 100) | round(1) }}%</span>
+                                        </div>
+                                    </div>
+                                    <p class="freshness-copy">Food freshness classification uses the current trained model to estimate product quality.</p>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-stage">
+                            <p class="eyebrow">Ready</p>
+                            <h3>Run an analysis to populate the viewer.</h3>
+                            <p>The result stage expands to support detailed inspection, compare mode, and object metrics.</p>
+                        </div>
+                    {% endif %}
+                </section>
+            </section>
+        </main>
+    </div>
+
+    {% if result %}
+        <section class="focus-overlay" id="focus-overlay" aria-hidden="true">
+            <div class="focus-backdrop" id="focus-backdrop"></div>
+            <div class="focus-shell glass-panel">
+                <div class="focus-header">
+                    <div>
+                        <p class="eyebrow">Fullscreen Inspection</p>
+                        <h3>{{ result.task_name }}</h3>
+                    </div>
+                    <div class="focus-actions">
+                        <button type="button" class="focus-action" id="zoom-out">-</button>
+                        <button type="button" class="focus-action" id="zoom-in">+</button>
+                        <button type="button" class="focus-action" id="fullscreen-toggle">Browser Fullscreen</button>
+                        <button type="button" class="focus-action" id="close-focus">Close</button>
+                    </div>
+                </div>
+
+                {% if result.objects is defined %}
+                    <div class="focus-layout">
+                        <div class="focus-viewer">
+                            <div class="compare-toolbar">
+                                <span>Original</span>
+                                <input type="range" min="0" max="100" value="55" id="focus-compare-range" aria-label="Fullscreen comparison slider">
+                                <span>Processed</span>
+                            </div>
+                            <div class="viewer-frame large" id="focus-viewer-frame">
+                                <div class="pan-zoom-frame large" id="focus-pan-zoom-frame">
+                                    <img src="{{ image_url }}" alt="Original image" class="compare-base">
+                                    <div class="compare-overlay" id="focus-compare-overlay" style="width: 55%;">
+                                        <img src="{{ output_image_url }}" alt="Processed image" class="compare-image">
+                                    </div>
+                                    <div class="compare-divider" id="focus-compare-divider" style="left: 55%;"></div>
+
+                                    {% for object in result.objects %}
+                                        <button
+                                            type="button"
+                                            class="detection-box"
+                                            data-box-id="focus-box-{{ loop.index0 }}"
+                                            data-target-id="row-{{ loop.index0 }}"
+                                            style="
+                                                left: {{ object.bbox.left_percent }}%;
+                                                top: {{ object.bbox.top_percent }}%;
+                                                width: {{ object.bbox.width_percent }}%;
+                                                height: {{ object.bbox.height_percent }}%;
+                                            "
+                                        >
+                                            <span>{{ object.name }} {{ object.confidence_percent }}%</span>
+                                        </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <aside class="focus-analysis">
+                            {% for object in result.objects %}
+                                <article class="object-row compact">
+                                    <div class="object-row-top">
+                                        <div>
+                                            <h4>{{ object.name }}</h4>
+                                            <p>{{ object.confidence_percent }}% confidence</p>
+                                        </div>
+                                        <strong>{{ object.area_percent }}%</strong>
+                                    </div>
+                                    <div class="coverage-bar">
+                                        <span style="width: {{ object.area_percent }}%;"></span>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </aside>
+                    </div>
+                {% else %}
+                    <div class="focus-freshness">
+                        <div class="freshness-ring large" style="--progress: {{ (result.confidence * 100) | round(1) }};">
+                            <div class="freshness-core">
+                                <strong>{{ result.label }}</strong>
+                                <span>{{ (result.confidence * 100) | round(1) }}%</span>
+                            </div>
+                        </div>
+                        {% if image_url %}
+                            <img src="{{ image_url }}" alt="Analyzed freshness image">
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    {% endif %}
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
